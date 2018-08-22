@@ -1,0 +1,235 @@
+# Semantic relatedness judgment tasks, the first words are training words, they are either related or unrelated to the second words in terms of their original meanings
+# Tested three times on Days 1, 2, and 8
+# Each task includes 80 related word pairs, and 80 word pairs
+### Data missing:
+# Day2 only: 726, 730
+# Day8 only: 722
+# didn't show up for S3: 715, 729
+# misunderstood instruction: 702
+# increased accuracy: 726
+## Two participants with low overall accuracy: 709--0.65/0.70, 731--0.69/0.59 for control/meaning conditions, and should be excluded from data analysis -- excluded earlier
+
+if (Sys.info()[['sysname']] == 'Windows') {
+  path = "C:/Users/xif20/Dropbox/Word Learning/Experiment2"
+} else {
+  path = "~/Dropbox/Word Learning/Experiment2"
+}
+
+setwd(path)
+getwd()
+
+# read the data file
+SR_readdata <- read.csv("SR_ExpABC.csv")
+SR <- SR_readdata
+
+# read the word and id corre
+WordAndId <- read.csv("C:/Users/xif20/Dropbox/Word Learning/Experiment 2A/data_formal/WordAndId.csv")
+
+# participants in Exp 2C with low accuracy (<70%): '709','731',
+
+# exclude some participants
+SR.valid <- subset(SR,Subject %in% c('702','715','729','719','730','722','204','210','213','217','218','228','416') == FALSE)
+
+# get a subset of critical trials, or exclude the practice trials
+SR.critical <- subset(SR.valid, SR.valid$Running != 'Prac')
+
+# add id to training words using the file with words and corresponding id.
+SR.critical <- merge(SR.critical,WordAndId,by='form')
+
+# add variables
+# word frequency and training type (with or without new meanings)
+SR.critical$id <- as.numeric(SR.critical$id)
+SR.critical$Frequency <- ifelse(SR.critical$id<12000,"high", "low")
+SR.critical$Subject <- as.numeric(SR.critical$Subject)
+SR.critical$Version <- SR.critical$Subject%%4
+SR.critical$Version <- ifelse(SR.critical$Version == 0,4,SR.critical$Version)
+SR.critical$TrainingType <- ifelse(SR.critical$Frequency == 'high', ifelse(SR.critical$Version == 1 | SR.critical$Version == 4, ifelse(SR.critical$id < 11200, 'meaning','control'),ifelse(SR.critical$id > 11200, 'meaning','control')),ifelse(SR.critical$Version == 1 | SR.critical$Version == 4, ifelse(SR.critical$id < 12200, 'meaning','control'),ifelse(SR.critical$id > 12200, 'meaning','control')))
+SR.critical$Related <- ifelse(SR.critical$Related == 1, 'related','unrelated')
+
+# define categorical variables
+SR.critical$Subject <- as.factor(SR.critical$Subject)
+SR.critical$Day <- as.factor(SR.critical$Day)
+SR.critical$id <- as.factor(SR.critical$id)
+SR.critical$form <- as.factor(SR.critical$form)
+SR.critical$probe <- as.factor(SR.critical$probe)
+SR.critical$Version <- as.factor(SR.critical$Version)
+SR.critical$Frequency <- as.factor(SR.critical$Frequency)
+SR.critical$TrainingType <- as.factor(SR.critical$TrainingType)
+SR.critical$Related <- as.factor(SR.critical$Related)
+SR.critical$SOA <- as.factor(SR.critical$SOA)
+
+# create a new variable RT which is equal to target.RT, and ACC equal to target.ACC
+SR.critical$RT <- SR.critical$probe.RT
+SR.critical$ACC <- SR.critical$probe.ACC
+SR.critical$Item <- SR.critical$form
+
+# check participants' overall accuracy and generate data for subjectanlaysis and item analysis
+tapply(SR.critical$ACC,SR.critical$Subject,mean)
+tapply(SR.critical$RT,SR.critical$Subject,mean)
+tapply(SR.critical$ACC,list(SR.critical$Subject,SR.critical$Related,SR.critical$TrainingType,SR.critical$Day,SR.critical$Frequency),mean)
+# for each subject, RT, good for by-subject analysis
+subjectanalysisdataACC <- tapply(SR.critical$ACC,list(SR.critical$Subject,SR.critical$Related,SR.critical$TrainingType,SR.critical$Day,SR.critical$Frequency),mean)
+write.xlsx(x = subjectanalysisdataACC,file = "subjectanalysisdataACC.xlsx",row.names = TRUE)
+# for each item, RT, good for by-item analysis
+itemanalysisdataACC <- tapply(SR.critical$ACC,list(SR.critical$IDform,SR.critical$Related,SR.critical$TrainingType,SR.critical$Day,SR.critical$SOA),mean)
+write.xlsx(x = itemanalysisdataACC,file = "itemanalysisdataACC.xlsx",row.names = TRUE)
+
+# accuracy analysis
+SR.ACC <- subset(SR.critical,SOA == 200 & Related == 'related')
+Model.ACC.mixed <- glmer(ACC~1+TrainingType*Frequency*Day+(1|Subject)+(1|Item),data = SR.ACC,family = binomial)
+summary(Model.ACC.mixed)
+
+Model.ACC.mixed.simple <- glmer(ACC~1+TrainingType*Frequency*Day+(1|Subject)+(1|Item),data = SR.ACC,family = binomial)
+
+anova(Model.ACC.mixed,Model.ACC.mixed.simple)
+
+#### outlier exclusion, for RT
+# reaction times outside of 2.5 SD of Subject mean, or beyong the range of 150 to 1500
+# creat a new dataframe including only correct trials
+SR.correct <- subset(SR.critical,SR.critical$ACC == 1)
+
+# calculate the derivation from subject mean for each participant
+SR.correct$deriv <- (SR.correct$RT - ave(SR.correct$RT,list(SR.correct$Day,SR.correct$Subject),FUN=mean))/ave(SR.correct$RT,list(SR.correct$Day,SR.correct$Subject),FUN=sd)
+
+# create a new dataset including only those within 2.5 SD or RT within 200 to 2000
+SR.correct.nooutlier <- subset(SR.correct,abs(SR.correct$deriv) <= 2.5 & (SR.correct$RT >= 200 & SR.correct$RT <= 2000))
+
+# descriptive statistics of ACC and RT in each cell
+# for each subject, RT, good for by-subject analysis
+subjectanalysisdataRT <- tapply(SR.correct.nooutlier$RT,list(SR.correct.nooutlier$Subject,SR.correct.nooutlier$Related,SR.correct.nooutlier$TrainingType,SR.correct.nooutlier$Day,SR.correct.nooutlier$Frequency), mean)
+
+# for each item, RT, good for by-item analysis
+itemanalysisdataRT <- tapply(SR.correct.nooutlier$RT,list(SR.correct.nooutlier$IDform,SR.correct.nooutlier$Day,SR.correct.nooutlier$TrainingType,SR.correct.nooutlier$SOA,SR.correct.nooutlier$Related), mean)
+write.csv(x = itemanalysisdataRT,file = "itemanalysisdataRT.csv",row.names = TRUE)
+
+tapply(SR.correct.nooutlier$RT,list(SR.correct.nooutlier$Related,SR.correct.nooutlier$TrainingType,SR.correct.nooutlier$Day,SR.correct.nooutlier$Frequency), mean)
+
+### Statistical anaysis
+## Repeated ANOVA for A and C separatedly
+# Exp A, SOA = 500 ms; Exp C, SOA = 200 ms;
+Exp.RT <- subset(SR.correct.nooutlier,SOA == 200 & Related == 'unrelated')
+Model.RT.Subject <- aov(RT~(TrainingType*Day*Frequency) + Error(Subject/(Day*Frequency*TrainingType)), data = Exp.RT)
+summary(Model.RT.Subject)
+Model.RT.Item <- aov(RT~(TrainingType*Day*Frequency) + Error(IDform/(Day*TrainingType)) +(Frequency), data = Exp.RT)
+summary(Model.RT.Item)
+
+Model.RT.mixed <- lmer(RT ~ 1 + TrainingType*Frequency*Day + (1+Day|Subject) + (1+Day|Item),data=Exp.RT)
+summary(Model.RT.mixed)
+Model.RT.mixed.slope <- lmer(RT ~ 1 + TrainingType*Day + (1+Day|Subject) + (1+Day|Item),data=Exp.RT)
+summary(Model.RT.mixed.slope)
+anova(Model.RT.mixed,Model.RT.mixed.slope)
+
+# simple effect analysis
+Exp.RT.OneContrast <- subset(SR.correct.nooutlier,SOA == 500 & Related == 'unrelated' & Frequency == 'high' & Day == 8)
+Model.RT.OneContrast <- lmer(RT ~ 1 + TrainingType + (1|Subject) + (1|Item),data=Exp.RT.OneContrast)
+summary(Model.RT.OneContrast)
+# to change the coding of Day: contrasts(Exp.RT$Day) <- contr.treatment(3,base = 2)
+# to change the coding of Frequency: contrasts(Exp.RT$Frequency) <- c(1,0)
+
+# Model.RT.anova <- aov(RT ~ (Day*Frequency*TrainingType*Related) + Error(Subject/(Day*Frequency*TrainingType*Related)),LD.correct.nooutlier)
+# print(model.tables(Model.RT.anova,"means"),digit = 3)
+# boxplot(RT ~ Day*Frequency*TrainingType, data= SR.correct.nooutlier)
+# 
+# Model.ACC.anova <- aov(ACC ~ (Day*Frequency*TrainingType) + Error(Subject/(Day*Frequency*TrainingType)),SR.critical)
+# print(model.tables(Model.ACC.anova,"means"),digit = 3)
+
+
+## Mixed effect modelling, no slope is added in the current models, but will be added soon
+library(lme4)
+
+# Have data for experiments A and C only, mixed effects modeling & Related == 'related'
+SR.correct.nooutlier.C <- subset(SR.correct.nooutlier,SOA == 200 & Related == 'related')
+Model.SR.RT.C.all <- lmer (RT ~ 1 + TrainingType*Frequency*Day + (1+Day|Subject) + (1+Day|Item),data=SR.correct.nooutlier.C)
+summary(Model.SR.RT.C.all)
+Model.SR.RT.C.simple <- lmer (RT ~ 1 + Frequency*Day + (1+Day|Subject) + (1+Day|Item),data=SR.correct.nooutlier.C)
+summary(Model.SR.RT.C.simple)
+anova(Model.SR.RT.C.all,Model.SR.RT.C.simple)
+
+Model.anova.subject.AC <- aov(RT~Day*Frequency*TrainingType+Error(Subject/(Day*Frequency*TrainingType)),data=SR.correct.nooutlier.AC)
+summary(Model.anova.subject.AC)
+
+aov(Recall~(Task*Valence)+Error(Subject/(Task*Valence)),data.ex4)
+
+Model.SR.RT.AC.no4way <- lmer (RT ~ 1 + Day*Frequency +TrainingType+TrainingType:Day+TrainingType:Frequency+ TrainingType:Related + TrainingType:Related:Day + TrainingType:Related:Frequency + TrainingType:Frequency:Day+ (1|Subject) + (1|Item),data=SR.correct.nooutlier.AC)
+summary(Model.SR.RT.AC.no4way)
+anova(Model.SR.RT.AC.all,Model.SR.RT.AC.no4way)
+
+# only short SOA = 200ms, Day == 1, Related = relatd
+SR.correct.nooutlier.C <- subset(SR.correct.nooutlier.AC,SOA == 200 & Day == 1 & Related == "relatd")
+Model.SR.RT.C.all <- lmer (RT ~ 1 + Freuqency*TrainingType + (1|Subject) + (1|Item),data=SR.correct.nooutlier.C)
+summary(Model.SR.RT.C.all)
+
+Model.SR.RT.C.notype <- lmer (RT ~ 1 + Freuqency + TrainingType + (1|Subject) + (1|Item),data=SR.correct.nooutlier.C)
+summary(Model.SR.RT.C.notype)
+anova(Model.SR.RT.C.all, Model.SR.RT.C.notype)
+
+## all data
+Model.SR.RT <- lmer (RT ~ 1 + Day*Frequency*TrainingType*Related*SOA + (1|Subject) + (1|Item),data=SR.correct.nooutlier)
+summary(Model.SR.RT)
+
+Model.SR.ACC <- glmer(ACC ~ 1 + Day*Frequency*TrainingType + (1|Subject) + (1|Item), data = SR.critical,family=binomial)
+summary(Model.SR.ACC)
+
+# anallyze data on Day 1 only
+SR.RT.Day1 <- subset(SR.correct.nooutlier, Day== '1')
+Model.SR.RT.Day1 <- lmer (RT ~ 1 + Frequency*TrainingType*Related*SOA + (1|Subject) + (1|Item),data=SR.RT.Day1)
+summary(Model.SR.RT.Day1)
+
+# to calculate correltion between perturbation and learning performance
+
+perturbation <- subset(SR.correct.nooutlier, Day== '1' & SOA == '200' & Related == "related" & Frequency == "high")
+summary(perturbation$Subject)
+tapply(perturbation$RT,list(perturbation$Subject,perturbation$TrainingType),mean)
+
+# to calculate the correlation between meaning access speed (RT) and perturbation effects (RT difference).
+CorrelMatrixRawData <- read.csv("Correlation.csv")
+# to calculate residul
+regreControl_Day1 <- lm(Control_Day1 ~ SR_Day1 + lgWF_Day1, data  = CorrelMatrixRawData,na.action=na.exclude)
+regreMeaning_Day1 <- lm(Meaning_Day1 ~ SR_Day1 + lgWF_Day1, data  = CorrelMatrixRawData,na.action=na.exclude)
+regreControl_Day2 <- lm(Control_Day2 ~ SR_Day2 + lgWF_Day2, data  = CorrelMatrixRawData,na.action=na.exclude)
+regreMeaning_Day2 <- lm(Meaning_Day2 ~ SR_Day2 + lgWF_Day2, data  = CorrelMatrixRawData,na.action=na.exclude)
+regreControl_Day8 <- lm(Control_Day8 ~ SR_Day8 + lgWF_Day8, data  = CorrelMatrixRawData,na.action=na.exclude)
+regreMeaning_Day8 <- lm(Meaning_Day8 ~ SR_Day8 + lgWF_Day8, data  = CorrelMatrixRawData,na.action=na.exclude)
+
+CorrelMatrixRawData$Control_Day1_Resi <- residuals(regreControl_Day1)
+CorrelMatrixRawData$Control_Day2_Resi <- residuals(regreControl_Day2)
+CorrelMatrixRawData$Control_Day8_Resi <- residuals(regreControl_Day8)
+
+CorrelMatrixRawData$Perturbation_Day1_Resi <- residuals(regreMeaning_Day1) - residuals(regreControl_Day1)
+CorrelMatrixRawData$Perturbation_Day2_Resi <- residuals(regreMeaning_Day2) - residuals(regreControl_Day2)
+CorrelMatrixRawData$Perturbation_Day8_Resi <- residuals(regreMeaning_Day8) - residuals(regreControl_Day8)
+
+CorrelMatrixRawData$Perturbation_Day1_Ratio_Resi <- CorrelMatrixRawData$Perturbation_Day1_Resi/CorrelMatrixRawData$Control_Day1_Resi
+CorrelMatrixRawData$Perturbation_Day2_Ratio_Resi <- CorrelMatrixRawData$Perturbation_Day2_Resi/CorrelMatrixRawData$Control_Day2_Resi
+CorrelMatrixRawData$Perturbation_Day8_Ratio_Resi <- CorrelMatrixRawData$Perturbation_Day8_Resi/CorrelMatrixRawData$Control_Day8_Resi
+
+# RT - 6:8,12:14;RT/ratior -6:8,15:17;  residual - 27:32; residual/rator -- 27:29,33:35
+CorrelMatrixData <- CorrelMatrixRawData[,c(27:32)]
+CorrelMatrix <- cor(CorrelMatrixData,use="complete.obs",method= "pearson")
+library('corrplot')
+corrplot(CorrelMatrix, method = "number",title = "Native Speakers")
+cor.mtest <- function(mat, conf.level = 0.95){
+  mat <- as.matrix(mat)
+  n <- ncol(mat)
+  p.mat <- lowCI.mat <- uppCI.mat <- matrix(NA, n, n)
+  diag(p.mat) <- 0
+  diag(lowCI.mat) <- diag(uppCI.mat) <- 1
+  for(i in 1:(n-1)){
+    for(j in (i+1):n){
+      tmp <- cor.test(mat[,i], mat[,j], conf.level = conf.level)
+      p.mat[i,j] <- p.mat[j,i] <- tmp$p.value
+      lowCI.mat[i,j] <- lowCI.mat[j,i] <- tmp$conf.int[1]
+      uppCI.mat[i,j] <- uppCI.mat[j,i] <- tmp$conf.int[2]
+    }
+  }
+  return(list(p.mat, lowCI.mat, uppCI.mat))
+}
+CorrMatrix <- cor.mtest(CorrelMatrixData,0.95)
+corrplot(CorrelMatrix, p.mat = CorrMatrix[[1]],method = "number",sig.level=0.05,insig = "blank",title = "Native Speakers")
+
+
+# use Hmisc package to calculate significance
+library(Hmisc)
+library('corrplot')
+CorrResults <- rcorr(as.matrix(CorrelMatrixData))
+corrplot(CorrResults$r,method = "number",p.mat = CorrResults$P, sig.level = 0.05,insig = "blank", title = "Native Speakers")
