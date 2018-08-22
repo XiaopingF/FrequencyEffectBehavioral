@@ -1,0 +1,141 @@
+
+# read meaning generation data
+MG.2A <- read.csv("./Dropbox/Word Learning/Experiment2/MeaningGeneration.all_rated_combine_2A.csv")
+MG.2B <- read.csv("./Dropbox/Word Learning/Experiment2/MeaningGeneration.all_rated_combine_2B.csv")
+MG <- rbind(MG.2A,MG.2B)
+
+
+# factory: Matching: Subject Day form Frequency type version
+# MG: form, Subject, Day, frequency, Iddefinition, IDform, test, type, Frequency, TrainingType, Item
+MG$Subject <- as.factor(MG$Subject)
+MG$form <- as.factor(MG$form)
+MG$Day <- as.factor(MG$Day)
+MG$Frequency <- as.factor(ifelse(MG$frequency == 1,'high','low'))
+MG$test <- as.factor(MG$test)
+MG$TrainingType <- as.factor(MG$TrainingType)
+MG$Item <- as.factor(MG$Item)
+MG$ACC <- ifelse(MG$Score < 1, 0,1)
+summary(MG)
+# exclude some participants who did not complete all the sessions
+MG <- subset(MG,Subject %in% c('204','210','213','217','218','228','416') == FALSE)
+
+# separete into learning and forgetting
+MG_learning <- subset(MG,Day == '1')
+MG_learning_meaning <- subset(MG_learning,TrainingType == 'meaning')
+summary(MG_learning)
+summary(MG_learning_meaning)
+MG_forgetting <- subset(MG, test == '3')
+MG_forgetting_meaning <- subset(MG_forgetting,TrainingType == 'meaning')
+summary(MG_forgetting)
+summary(MG_forgetting_meaning)
+
+# statistical analysis
+Model.learning.meaning <- lmer(Score ~ Frequency*test + (1|Subject) + (1|Item),data = MG_learning_meaning)
+summary(Model.learning.meaning)
+Model.learning.meaning.nointer <- lmer(Score ~ Frequency+test + (1|Subject) + (1|Item),data = MG_learning_meaning)
+summary(Model.learning.meaning.nointer)
+anova(Model.learning.meaning,Model.learning.meaning.nointer)
+
+Model.learning.meaning.slope <- lmer(Score ~ Frequency*test + (1|Subject) + (1|Item),data = MG_learning_meaning)
+summary(Model.learning.meaning)
+
+
+#####################################################################################
+
+# read data of Matching (multiple-choice) task
+Match <- read.csv("./Dropbox/Word Learning/Experiment2/Matching_2AB_good.csv")
+
+Match$Subject <- as.factor(Match$Subject)
+Match$Day <- as.factor(Match$Day)
+Match$form <- as.factor(Match$form)
+Match$Frequency <- as.factor(ifelse(Match$frequency == 1,'high','low'))
+Match$TrainingType <- as.factor(ifelse(Match$type == 1, 'meaning','control'))
+Match$type <- as.factor(Match$type)
+Match$RT <- Match$choices.RT
+Match$choices.RESP[is.na(Match$choices.RESP)] <- 0
+Match$Bias[Match$choices.RESP == 0] <- NA
+Match$Detect <- ifelse(Match$choices.RESP == 4, 0,ifelse (Match$choices.RESP >0,1,Match$choices.RESP))
+
+Match.correct <- subset(Match,choices.ACC == 1)
+# calculate the derivation from subject mean for each participant
+Match.correct$deriv <- (Match.correct$RT - ave(Match.correct$RT,list(Match.correct$Subject,Match.correct$Day),FUN=mean))/ave(Match.correct$RT,list(Match.correct$Subject,Match.correct$Day),FUN=sd)
+
+# create a new dataset including only those within 2.5 SD AND RT within 150 to 1500
+Match.correct.nooutlier <- subset(Match.correct,abs(Match.correct$deriv) <= 2.5 & (Match.correct$RT >= 200 & Match.correct$RT <= 5000))
+
+# response bias in Matching: tendency of choosing 4th option when a participant does not know the meanings, and use it as covariant to reduce the influence of such response bias in control conditions.
+# get incorrect trials in meaning conditions, then calculate the ratio/tendency
+Match.incorrect.meaning <- subset(Match, TrainingType == 'meaning')
+Match.incorrect.meaning <- subset(Match.incorrect.meaning, choices.ACC == '0') 
+
+Match.incorrect.meaning$FA <- ifelse(Match.incorrect.meaning$choices.RESP == 4,1,0)
+
+tapply(Match.incorrect.meaning$FA,list(Match.incorrect.meaning$Subject,Match.incorrect.meaning$Day,Match.incorrect.meaning$Frequency),mean)
+tapply(Match.incorrect.meaning$FA,list(Match.incorrect.meaning$Day,Match.incorrect.meaning$Frequency),mean)
+tapply(Match.incorrect.meaning$FA,list(Match.incorrect.meaning$Subject,Match.incorrect.meaning$Day),mean)
+tapply(Match.incorrect.meaning$FA,list(Match.incorrect.meaning$Day),mean)
+
+# response bias: bias of choosing the fourth option (i.e., no meaning)
+tapply(Match$Bias,list(Match$Subject,Match$Day),mean)
+
+# just look at how well participants were able to distinguish whether a word has a meaning or not
+tapply(Match$Detect,list(Match$Day,Match$TrainingType,Match$Frequency),mean)
+
+## how well participats are able to detect the correct meanings for words with new meanings
+Match.meaning <- subset(Match, TrainingType == "meaning")
+Match.meaning.real <- subset(Match.meaning,Detect == 1)
+
+tapply(Match.meaning.real$choices.ACC,list(Match.meaning.real$Day,Match.meaning.real$Frequency),mean)
+
+# descriptive data
+tapply(MG$Score,list(MG$Day,MG$test,MG$TrainingType,MG$Frequency),mean)
+tapply(MG$Score,list(MG$Day,MG$test,MG$TrainingType,MG$Frequency),sd)
+a <- tapply(MG$Score,list(MG$Subject,MG$Day,MG$test,MG$Frequency,MG$TrainingType),mean)
+
+
+tapply(MG$ACC,list(MG$Day,MG$test,MG$TrainingType,MG$Frequency),mean)
+tapply(MG$ACC,list(MG$Day,MG$test,MG$TrainingType,MG$Frequency),sd)
+b <- tapply(MG$ACC,list(MG$Subject,MG$Day,MG$test,MG$Frequency,MG$TrainingType),mean)
+
+tapply(Match$choices.ACC,list(Match$Day,Match$TrainingType,Match$Frequency),mean)
+tapply(Match$choices.ACC,list(Match$Day,Match$TrainingType,Match$Frequency),sd)
+c <- tapply(Match$choices.ACC,list(Match$Subject,Match$Day,Match$Frequency,Match$TrainingType),mean)
+
+tapply(Match.correct.nooutlier$RT,list(Match.correct.nooutlier$Day,Match.correct.nooutlier$TrainingType,Match.correct.nooutlier$Frequency),mean)
+tapply(Match.correct.nooutlier$RT,list(Match.correct.nooutlier$Day,Match.correct.nooutlier$TrainingType,Match.correct.nooutlier$Frequency),sd)
+d <- tapply(Match.correct.nooutlier$RT,list(Match.correct.nooutlier$Subject, Match.correct.nooutlier$Day,Match.correct.nooutlier$TrainingType,Match.correct.nooutlier$Frequency),sd)
+
+## error type
+# MG: new-new interference
+MG.errortype <- subset(MG,ACC == 0)
+MG.errortype$Miss[is.na(MG.errortype$Miss)] <- 0
+MG.errortype$NewNewInterference[is.na(MG.errortype$NewNewInterference)] <- 0
+
+tapply(MG.errortype$Miss,list(MG.errortype$Day,MG.errortype$test,MG.errortype$TrainingType,MG.errortype$Frequency),sum)
+tapply(MG.errortype$NewNewInterference,list(MG.errortype$Day,MG.errortype$test,MG.errortype$TrainingType,MG.errortype$Frequency),sum)
+
+
+# statistical analysis
+library(lme4)
+# meaning
+MG.meaning <- subset(MG,TrainingType == 'meaning')
+MG.meaning.Day1 <- subset(MG.meaning,Day == '1')
+Model.MG.meaning.Day1.ACC <- glmer (ACC ~ 1 + Frequency*test + (1+Frequency|Subject) + (1+test|Item),data=MG.meaning.Day1,family=binomial)
+summary(Model.MG.meaning.Day1.ACC)
+
+MG.meaning.decay <- subset(MG.meaning,test == '3')
+Model.MG.meaning.decay.ACC <- glmer (ACC ~ 1 + Frequency*Day + (1+Day+Frequency|Subject) + (1+Day|Item),data=MG.meaning.decay,family=binomial)
+summary(Model.MG.meaning.decay.ACC)
+Model.MG.meaning.decay.ACC.simple <- glmer (ACC ~ 1 + Frequency*Day + (1|Subject) + (1|Item),data=MG.meaning.decay,family=binomial)
+anova(Model.MG.meaning.decay.ACC,Model.MG.meaning.decay.ACC.simple)
+
+# control
+MG.control <- subset(MG,TrainingType == 'control')
+MG.control.Day1 <- subset(MG.control,Day == '1')
+Model.MG.control.Day1.ACC <- glmer (ACC ~ 1 + Frequency*test + (1+Frequency|Subject) + (1+test|Item),data=MG.control.Day1,family=binomial)
+summary(Model.MG.control.Day1.ACC)
+
+MG.control.decay <- subset(MG.control,test == '3')
+Model.MG.control.decay.ACC <- glmer (ACC ~ 1 + Frequency*Day + (1+Frequency|Subject) + (1+test|Item),data=MG.control.decay,family=binomial)
+summary(Model.MG.control.decay.ACC)
+
