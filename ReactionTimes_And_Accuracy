@@ -1,4 +1,4 @@
-# Semantic relatedness judgment tasks, the first words are training words, they are either related or unrelated to the second words in terms of their original meanings
+# The script is for the semantic relatedness judgment tasks, the first words are training words, they are either related or unrelated to the second words in terms of their original meanings
 # Tested three times on Days 1, 2, and 8
 # Each task includes 80 related word pairs, and 80 word pairs
 ### Data missing:
@@ -25,9 +25,9 @@ SR <- SR_readdata
 # read the word and id corre
 WordAndId <- read.csv("C:/Users/xif20/Dropbox/Word Learning/Experiment 2A/data_formal/WordAndId.csv")
 
-# participants in Exp 2C with low accuracy (<70%): '709','731',
+# participants in Exp 2C with low accuracy (<70%): '709','731'
 
-# exclude some participants
+# exclude some participants: did not complete all the sessions
 SR.valid <- subset(SR,Subject %in% c('702','715','729','719','730','722','204','210','213','217','218','228','416') == FALSE)
 
 # get a subset of critical trials, or exclude the practice trials
